@@ -1,0 +1,28 @@
+project:
+  type: book
+  output-dir: _site
+  render:
+    - chapter-list.yml
+  preview:
+    port: 4000
+    browser: false
+
+metadata-files:
+  - chapter-list.yml
+
+book:
+  title: "Modern Cynicism"
+  favicon: images/mc_logo.webp
+  navbar:
+    logo: images/mc_logo.webp
+
+format:
+  html:
+    theme: [united, theme.scss]
+    toc: true
+    code-overflow: wrap
+  pdf:
+    format: typst
+    papersize: a5
+  epub:
+    toc: true
