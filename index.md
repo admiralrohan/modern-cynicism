@@ -1,3 +1,3 @@
 # Welcome {.unnumbered}
 
-Hey reader.
+This is the theory to unify all existing fragmented ideas on human psychology.

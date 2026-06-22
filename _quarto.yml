@@ -12,6 +12,7 @@ metadata-files:
 
 book:
   title: "Modern Cynicism"
+  author: "Rohan Gayen"
   favicon: images/mc_logo.webp
   navbar:
     logo: images/mc_logo.webp

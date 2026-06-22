@@ -4,6 +4,7 @@ import re
 import shutil
 
 INCOMING_DIR = "incoming"
+LIST_CONTINUATION_INDENT = 3
 
 def extract_first_number(text):
     """Extracts true integers to handle the 1 vs 10 sorting bug properly."""
@@ -39,8 +40,12 @@ def clean_display_title(text):
 
 def process_file_content(file_path, original_filename):
     """
-    1. Injects a clear H1 title at the top of the file based on its name.
-    2. Converts strict standalone bold lines to clean H2 markdown tags.
+    1. Injects H1 title at the top of the file based on its name.
+    2. Fixes Scrivener's escaped list numbers (e.g. \\1. -> 1.).
+    3. Normalizes continuation lines to consistent indentation.
+    4. Converts standalone bold list text like **1. Point 1:** to 1. **Point 1:**.
+    5. Strips redundant inner numbers from list item bold text (e.g., 2. **2. Point 2:** -> 2. **Point 2:**).
+    6. Promotes standalone **bold** lines to H2.
     """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -50,15 +55,59 @@ def process_file_content(file_path, original_filename):
         modified_lines = []
 
         chapter_h1_title = clean_display_title(original_filename)
+
+        while lines and not lines[0].strip():
+            lines = lines[1:]
+        while lines and lines[0].strip().lower().lstrip('#').strip() == chapter_h1_title.lower():
+            lines = lines[1:]
+            while lines and not lines[0].strip():
+                lines = lines[1:]
         modified_lines.append(f"# {chapter_h1_title}\n\n")
 
-        for line in lines:
+        indent_prefix = ' ' * LIST_CONTINUATION_INDENT
+
+        for i, line in enumerate(lines):
             stripped = line.strip()
-            match = re.match(r'^\*\*(.*?)\*\*$', stripped)
+            ending = "\r\n" if line.endswith("\r\n") else "\n"
+
+            # Fix Scrivener's escaped list numbers (e.g., \1. -> 1.)
+            escaped = re.search(r'\\\d+\.', line)
+            if escaped:
+                line = re.sub(r'\\\d+\.', lambda m: m.group(0)[1:], line)
+                stripped = re.sub(r'\\\d+\.', lambda m: m.group(0)[1:], stripped)
+
+            # Convert standalone bold text that looks like a numbered list item
+            # e.g., **1. Point 1:** -> 1. **Point 1:**
+            #        **1. Point 1:** more text -> 1. **Point 1:** more text
+            bold_list_match = re.match(r'^\*\*(\d+)\.\s+(.*?):\s*\*\*', stripped)
+            if bold_list_match:
+                num = bold_list_match.group(1)
+                text = bold_list_match.group(2)
+                rest = stripped[bold_list_match.end():].strip()
+                if rest:
+                    stripped = f"{num}. **{text}:** {rest}"
+                else:
+                    stripped = f"{num}. **{text}:**"
+                line = stripped + ending
+
+            # Remove redundant inner list number from bold text in list items
+            # e.g., 2. **2. Point 2:** -> 2. **Point 2:**
+            list_match = re.match(r'^(\d+)\.\s+\*\*\1\.\s+', stripped)
+            if list_match:
+                stripped = re.sub(r'^(\d+)\.\s+\*\*\1\.\s+', r'\1. **', stripped)
+                line = stripped + ending
+
+            # Normalize indentation
+            if line.startswith((' ', '\t')):
+                line = indent_prefix + stripped + ending
+
+            # Match strictly: line is standalone bold text
+            match = None
+            if not re.match(r'^\d+\.', stripped):
+                match = re.match(r'^\*\*(.*?)\*\*$', stripped)
 
             if match and match.group(1).strip():
                 header_text = match.group(1).strip()
-                ending = "\r\n" if line.endswith("\r\n") else "\n"
                 modified_lines.append(f"## {header_text}{ending}")
             else:
                 modified_lines.append(line)
@@ -71,7 +120,7 @@ def process_file_content(file_path, original_filename):
 def purge_old_iteration():
     """Wipes out previous chapter builds in the root, protecting configuration metadata."""
     print("🧹 Purging old iteration files from root...")
-    protected_files = {'index.md', 'process-manuscript.py', 'theme.scss', '_quarto.yml', 'README.md'}
+    protected_files = {'index.md', 'process-manuscript.py', 'theme.scss', '_quarto.yml', 'README.md', 'table-of-contents.md', 'chapter-list.yml'}
 
     for item in os.listdir('.'):
         if os.path.isfile(item) and item.endswith(('.md', '.qmd')):
@@ -83,7 +132,7 @@ def ensure_workspace():
     """Guarantees index.md and the incoming landing zone directory exist."""
     if not os.path.exists("index.md"):
         with open("index.md", "w", encoding="utf-8") as f:
-            f.write('---\ntitle: \"Modern Cynicism\"\n---\n\n# Introduction {.unnumbered}\n\nWelcome.\n')
+            f.write('---\ntitle: "Modern Cynicism"\n---\n\n# Introduction {.unnumbered}\n\nWelcome.\n')
     if not os.path.exists(INCOMING_DIR):
         os.makedirs(INCOMING_DIR)
 
@@ -96,7 +145,7 @@ def process_pipeline():
 
     incoming_items = os.listdir(INCOMING_DIR)
     if not incoming_items:
-        print(f"ℹ️ '{INCOMING_DIR}/' folder is empty. Drop your Scrivener exports there first.")
+        print(f"ℹ️  '{INCOMING_DIR}/' folder is empty. Drop your Scrivener exports there first.")
         print("=" * 60)
         return
 
@@ -147,7 +196,7 @@ def process_pipeline():
                 process_file_content(old_file_path, chapter)
                 shutil.move(old_file_path, new_file_path)
 
-                quarto_chapters.append(f"        - \"{clean_file_slug}\"")
+                quarto_chapters.append(f"        - {clean_file_slug}")
                 web_link = clean_file_slug.replace(".md", ".html").replace(".qmd", ".html")
 
                 toc_content.append(f"{global_chapter_counter}. [{chapter_title}]({web_link})")
@@ -170,29 +219,24 @@ def process_pipeline():
             process_file_content(old_file_path, chapter)
             shutil.move(old_file_path, new_file_path)
 
-            quarto_chapters.append(f"    - \"{clean_file_slug}\"")
+            quarto_chapters.append(f"    - {clean_file_slug}")
             web_link = clean_file_slug.replace(".md", ".html").replace(".qmd", ".html")
 
             toc_content.append(f"{global_chapter_counter}. [{chapter_title}]({web_link})")
             global_chapter_counter += 1
 
-    # 3. Write structural outputs
+    # Write structural outputs
     with open("chapter-list.yml", "w", encoding="utf-8") as f:
         f.write("\n".join(quarto_chapters) + "\n")
 
     with open("table-of-contents.md", "w", encoding="utf-8") as f:
         f.write("\n".join(toc_content) + "\n")
 
-    # 4. Clean the landing directory for subsequent iterations
-    for item in os.listdir(INCOMING_DIR):
-        item_path = os.path.join(INCOMING_DIR, item)
-        if os.path.isdir(item_path):
-            shutil.rmtree(item_path)
-        else:
-            os.remove(item_path)
-
     print("=" * 60)
-    print("✅ SUCCESS: H1 titles added to files. Heading promotion bug resolved.")
+    print(" Manuscript processing complete.")
+    print(f" - {len(quarto_chapters) - 4} chapters processed and moved to root")
+    print(" - chapter-list.yml updated")
+    print(" - table-of-contents.md generated")
     print("=" * 60)
 
 if __name__ == "__main__":
