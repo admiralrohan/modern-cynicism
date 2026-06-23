@@ -22,8 +22,9 @@ format:
     theme: [united, theme.scss]
     toc: true
     code-overflow: wrap
-  pdf:
-    format: typst
+    smooth-scroll: true
+  typst:
     papersize: a5
+    template: custom-template.typ
   epub:
     toc: true
