@@ -19,3 +19,13 @@ To check your layout, formatting, and links locally before updating your site:
 ```bash
 quarto preview
 ```
+
+### 3. Make Changes to Live Website
+
+After copying the manuscript into the `incoming/` directory and running the processor, you can publish your changes to GitHub Pages:
+
+```bash
+quarto publish gh-pages
+```
+
+(We have github actions setup in this project for automating this process)
