@@ -2,4 +2,4 @@
 
 This is the theory to unify all existing fragmented ideas on human psychology.
 
-Learn once, use everywhere.
+This theory will help you to learn once, use everywhere.
