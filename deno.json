@@ -1,0 +1,8 @@
+{
+  "tasks": {
+    "prepare": "python3 process-manuscript.py",
+    "web": "quarto preview",
+    "build": "quarto render --to typst",
+    "deploy": "quarto publish gh-pages"
+  }
+}
