@@ -16,6 +16,7 @@ book:
   favicon: images/mc_logo.webp
   navbar:
     logo: images/mc_logo.webp
+  site-url: https://moderncynicism.com
 
 format:
   html:
